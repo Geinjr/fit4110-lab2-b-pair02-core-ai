@@ -1,66 +1,66 @@
 # Phân tích yêu cầu — vai Consumer
 
-- Cặp đàm phán:
+- Cặp đàm phán: Cặp 02
 - Product: A / B
-- Consumer service:
-- Provider service:
-- Người viết:
-- Ngày:
+- Consumer service: Core Business
+- Provider service: AI Vision
+- Người viết: Nguyễn Công Hiệp
+- Ngày: 18/05/2026
 
 ---
 
 ## 1. Resource Consumer cần nhận/gửi
 
-| Resource | Consumer dùng để làm gì? | Field bắt buộc với Consumer | Field có thể tùy chọn |
-|---|---|---|---|
-| `<Resource 1>` |  |  |  |
-| `<Resource 2>` |  |  |  |
+| Resource          | Consumer dùng để làm gì?         | Field bắt buộc với Consumer                   | Field có thể tùy chọn       |
+| ----------------- | -------------------------------- | --------------------------------------------- | --------------------------- |
+| `FaceMatchResult` | Ra quyết định xác minh danh tính | `decision`, `confidence`, `matchId`           | `subjectId`, `reason`       |
+| `Detection`       | Audit và dashboard bất thường    | `detectionId`, `objects`, `overallConfidence` | `riskLevel`, `modelVersion` |
 
 ---
 
 ## 2. API Consumer cần gọi
 
-| Method | Path | Lúc nào gọi? | Kỳ vọng response |
-|---|---|---|---|
-| POST | `/...` |  |  |
-| GET | `/.../{id}` |  |  |
+| Method | Path                               | Lúc nào gọi?                   | Kỳ vọng response               |
+| ------ | ---------------------------------- | ------------------------------ | ------------------------------ |
+| POST   | `/vision/face-match`               | Khi cần xác minh danh tính     | 200 với decision và confidence |
+| GET    | `/vision/detections/{detectionId}` | Khi cần lấy chi tiết detection | 200 với objects và riskLevel   |
+| GET    | `/vision/results/recent`           | Khi cần audit hoặc dashboard   | 200 với danh sách kết quả      |
+| GET    | `/health`                          | Trước khi gọi API chính        | 200 status ok                  |
 
 ---
 
 ## 3. Error case Consumer cần xử lý
 
-Tối thiểu 5 case.
-
-| Status | Consumer hiểu là gì? | Consumer sẽ xử lý thế nào? |
-|---:|---|---|
-| 400 | Request sai schema | Sửa payload/log lỗi |
-| 401 | Thiếu token | Refresh/cấu hình token |
-| 403 | Không đủ quyền | Báo lỗi quyền truy cập |
-| 404 | Không tìm thấy resource | Hiển thị trạng thái không tồn tại |
-| 409 | Xung đột nghiệp vụ | Retry hoặc yêu cầu thao tác lại |
-| 422 | Vi phạm rule nghiệp vụ | Hiển thị lý do cụ thể |
+| Status | Consumer hiểu là gì?      | Consumer sẽ xử lý thế nào?         |
+| -----: | ------------------------- | ---------------------------------- |
+|    400 | Request sai schema        | Kiểm tra lại payload trước khi gửi |
+|    401 | Thiếu token               | Refresh token rồi retry            |
+|    403 | Không đủ quyền            | Báo lỗi quyền truy cập cho admin   |
+|    404 | detectionId không tồn tại | Hiển thị trạng thái không tìm thấy |
+|    422 | Ảnh chất lượng thấp       | Yêu cầu chụp lại ảnh               |
+|    500 | AI Vision lỗi             | Retry sau 30 giây hoặc fallback    |
 
 ---
 
 ## 4. Giả định bổ sung
 
-- Giả định 1:
-- Giả định 2:
-- Giả định 3:
+- Giả định 1: AI Vision luôn trả response trong vòng 3 giây.
+- Giả định 2: confidence dùng thang float 0.0 đến 1.0.
+- Giả định 3: Core tự quyết định ngưỡng confidence để coi là MATCH.
 
 ---
 
 ## 5. Câu hỏi cho Provider
 
-1. 
-2. 
-3. 
+1. AI Vision có cache kết quả theo traceId không?
+2. Khi model đang cập nhật thì API có downtime không?
+3. Giới hạn số request mỗi phút là bao nhiêu?
 
 ---
 
 ## 6. Rủi ro tích hợp
 
-| Rủi ro | Tác động | Đề xuất xử lý |
-|---|---|---|
-| Provider đổi kiểu dữ liệu | Consumer parse lỗi | Chốt type/format/pattern |
-| Provider thiếu mã lỗi | Consumer khó xử lý lỗi | Chuẩn hóa Problem Details |
+| Rủi ro                       | Tác động                      | Đề xuất xử lý                |
+| ---------------------------- | ----------------------------- | ---------------------------- |
+| AI Vision trả LOW_CONFIDENCE | Core không ra được quyết định | Thống nhất fallback behavior |
+| modelVersion thay đổi        | Kết quả không nhất quán       | Ghi modelVersion vào log     |
